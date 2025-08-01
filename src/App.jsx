@@ -62,51 +62,84 @@ function App() {
   };
 
 
-  const handleAddTime = () => {
-    if (isFutureDate(selectedDate)) return;
+const handleAddTime = () => {
+  if (!isValidDuration(studyDuration)) {
+    alert("Please enter a valid duration in HH:MM:SS format.");
+    return;
+  }
 
-    const hoursToAdd = getDurationInHours();
-    if (hoursToAdd <= 0) return;
+  const hoursToAdd = getDurationInHours();
+  if (hoursToAdd <= 0) {
+    alert("Duration must be greater than 0.");
+    return;
+  }
 
-    const key = formatDate(selectedDate);
-    if ((studyHours[key] || 0) + hoursToAdd > 24) return;
+  const key = formatDate(selectedDate);
 
-    const updated = {
-      ...studyHours,
-      [key]: (studyHours[key] || 0) + hoursToAdd,
-    };
+  const currentHours = studyHours[key] || 0;
+  if (currentHours + hoursToAdd > 24) {
+    alert("Cannot log more than 24 hours in a single day.");
+    return;
+  }
 
-    setStudyHours(updated);
-    saveToLocal(updated);
-
-    setShowConfirmation(true);
-    setTimeout(() => setShowConfirmation(false), 3000);
+  const updated = {
+    ...studyHours,
+    [key]: currentHours + hoursToAdd,
   };
 
-  const handleSubtractTime = () => {
-    if (isFutureDate(selectedDate)) return;
-    const hoursToSubtract = getDurationInHours();
-    if (hoursToSubtract <= 0) return;
+  setStudyHours(updated);
+  saveToLocal(updated);
+  setShowConfirmation(true);
 
-    const key = formatDate(selectedDate);
-    if (!studyHours[key]) return;
+  // Reset input
+  setStudyDuration("00:00:00");
+  setSelectedDate(new Date());
+};
 
-    const current = studyHours[key];
-    const newTime = current - hoursToSubtract;
+function formatToHHMMSS(decimalHours) {
+  const totalSeconds = Math.floor(decimalHours * 3600);
+  const hrs = Math.floor(totalSeconds / 3600);
+  const mins = Math.floor((totalSeconds % 3600) / 60);
+  const secs = totalSeconds % 60;
+  return `${hrs.toString().padStart(2, "0")}:${mins
+    .toString()
+    .padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+}
 
-    const updated = { ...studyHours };
-    if (newTime > 0) {
-      updated[key] = newTime;
-    } else {
-      delete updated[key];
-    }
+const handleSubtractTime = () => {
+  if (!isValidDuration(studyDuration)) {
+    alert("Please enter a valid duration in HH:MM:SS format.");
+    return;
+  }
 
-    setStudyHours(updated);
-    saveToLocal(updated);
+  const hoursToSubtract = getDurationInHours();
+  if (hoursToSubtract <= 0) {
+    alert("Duration must be greater than 0.");
+    return;
+  }
 
-    setShowConfirmation(true);
-    setTimeout(() => setShowConfirmation(false), 3000);
-  };
+  const key = formatDate(selectedDate);
+  const currentHours = studyHours[key] || 0;
+
+  const newTime = currentHours - hoursToSubtract;
+  const updated = { ...studyHours };
+
+  if (newTime > 0) {
+    updated[key] = newTime;
+  } else {
+    delete updated[key];
+    alert("Time subtracted completely. Entry deleted.");
+  }
+
+  setStudyHours(updated);
+  saveToLocal(updated);
+  setShowConfirmation(true);
+
+  // Reset input
+  setStudyDuration("00:00:00");
+  setSelectedDate(new Date());
+};
+
 
   const handleUndoDelete = () => {
     if (!undoLog) return;
@@ -126,9 +159,15 @@ function App() {
     saveToLocal(updated);
     setUndoLog(deletedEntry);
 
-    if (undoTimer) clearTimeout(undoTimer);
-    const timer = setTimeout(() => setUndoLog(null), 5000);
-    setUndoTimer(timer);
+    if (undoTimer) {
+  clearTimeout(undoTimer);
+}
+const timer = setTimeout(() => {
+  setUndoLog(null);
+  setUndoTimer(null); // ✅ Also reset the timer ref
+}, 5000);
+setUndoTimer(timer);
+
   };
 
   const data = Object.entries(studyHours)
@@ -164,7 +203,8 @@ function App() {
                 className="focus:outline focus:ring-2 focus:ring-blue-500 flex-1 bg-neutral-800 hover:bg-neutral-700 px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-200 ease-in-out hover:scale-[1.02] cursor-pointer"
                 calendarClassName="dark-datepicker"
                 popperPlacement="bottom-start"
-                maxDate={new Date()} // ✅ Prevent selecting future dates
+                 minDate={new Date(new Date().setDate(new Date().getDate() - 31))}
+  maxDate={new Date()}
               />
 
             </div>
@@ -193,9 +233,7 @@ function App() {
                   Invalid time. Use HH:MM:SS (00–23:59:59)
                 </p>
               )}
-              <p className="mt-2 text-sm text-gray-400">
-                Total: <strong>{getDurationInHours().toFixed(4)} hours</strong>
-              </p>
+              
             </div>
           </div>
 
@@ -219,7 +257,7 @@ function App() {
         {/* Summary Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8 text-center text-white">
           <div className="bg-[#1a1a1a] p-4 rounded-xl shadow-md">
-            <div className="text-lg font-semibold">📅 Days Logged</div>
+            <div className="text-lg font-semibold">📅 Days Studied</div>
             <div className="text-2xl mt-1">{totalDays}</div>
           </div>
           <div className="bg-[#1a1a1a] p-4 rounded-xl shadow-md">
@@ -250,6 +288,8 @@ function App() {
                 />
                 <YAxis stroke="#e5e5e5" />
                 <Tooltip
+                formatter={(value) => formatToHHMMSS(value)} 
+      labelFormatter={(label) => `Date: ${label}`}
                   contentStyle={{
                     backgroundColor: "#1a1a1a",
                     borderColor: "#4b5563",
@@ -279,7 +319,7 @@ function App() {
                     <strong>{(() => {
                       const [d, m, y] = date.split("-");
                       return `${d}-${m}-${y}`;
-                    })()}</strong> - {hours.toFixed(4)} hours
+                    })()}</strong> - {formatToHHMMSS(hours)} hours
                   </span>
                   <button
                     onClick={() => handleDeleteDate(date)}
