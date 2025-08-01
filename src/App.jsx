@@ -62,39 +62,43 @@ function App() {
   };
 
 
-const handleAddTime = () => {
+
+const handleUpdateTime = (isAddition) => {
   if (!isValidDuration(studyDuration)) {
     alert("Please enter a valid duration in HH:MM:SS format.");
     return;
   }
 
-  const hoursToAdd = getDurationInHours();
-  if (hoursToAdd <= 0) {
+  const hoursDelta = getDurationInHours();
+  if (hoursDelta <= 0) {
     alert("Duration must be greater than 0.");
     return;
   }
 
   const key = formatDate(selectedDate);
-
   const currentHours = studyHours[key] || 0;
-  if (currentHours + hoursToAdd > 24) {
+  const newHours = isAddition ? currentHours + hoursDelta : currentHours - hoursDelta;
+
+  if (isAddition && newHours > 24) {
     alert("Cannot log more than 24 hours in a single day.");
     return;
   }
 
-  const updated = {
-    ...studyHours,
-    [key]: currentHours + hoursToAdd,
-  };
+  const updated = { ...studyHours };
+  if (newHours <= 0) {
+    delete updated[key];
+    alert("Time subtracted completely. Entry deleted.");
+  } else {
+    updated[key] = newHours;
+  }
 
   setStudyHours(updated);
   saveToLocal(updated);
   setShowConfirmation(true);
-
-  // Reset input
   setStudyDuration("00:00:00");
   setSelectedDate(new Date());
 };
+
 
 function formatToHHMMSS(decimalHours) {
   const totalSeconds = Math.floor(decimalHours * 3600);
@@ -105,41 +109,6 @@ function formatToHHMMSS(decimalHours) {
     .toString()
     .padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
 }
-
-const handleSubtractTime = () => {
-  if (!isValidDuration(studyDuration)) {
-    alert("Please enter a valid duration in HH:MM:SS format.");
-    return;
-  }
-
-  const hoursToSubtract = getDurationInHours();
-  if (hoursToSubtract <= 0) {
-    alert("Duration must be greater than 0.");
-    return;
-  }
-
-  const key = formatDate(selectedDate);
-  const currentHours = studyHours[key] || 0;
-
-  const newTime = currentHours - hoursToSubtract;
-  const updated = { ...studyHours };
-
-  if (newTime > 0) {
-    updated[key] = newTime;
-  } else {
-    delete updated[key];
-    alert("Time subtracted completely. Entry deleted.");
-  }
-
-  setStudyHours(updated);
-  saveToLocal(updated);
-  setShowConfirmation(true);
-
-  // Reset input
-  setStudyDuration("00:00:00");
-  setSelectedDate(new Date());
-};
-
 
   const handleUndoDelete = () => {
     if (!undoLog) return;
@@ -240,13 +209,13 @@ setUndoTimer(timer);
           {/* Buttons */}
           <div className="flex flex-col sm:flex-row gap-3">
             <button
-              onClick={handleAddTime}
+              onClick={() => handleUpdateTime(true)} // add
               className="focus:outline focus:ring-2 focus:ring-blue-500 flex-1 bg-[#3b3b3b] hover:bg-[#505050] px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-200 ease-in-out hover:scale-[1.02] cursor-pointer"
             >
               ➕ Add Time
             </button>
             <button
-              onClick={handleSubtractTime}
+              onClick={() => handleUpdateTime(false)} // subtract
               className="focus:outline focus:ring-2 focus:ring-blue-500 flex-1 bg-[#3b3b3b] hover:bg-[#505050] px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-200 ease-in-out hover:scale-[1.02] cursor-pointer"
             >
               ➖ Subtract Time
