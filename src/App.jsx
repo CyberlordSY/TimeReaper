@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import {
-  BarChart,
-  Bar,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   Tooltip,
@@ -10,12 +10,15 @@ import {
 import Navbar from "./components/Navbar";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+import "./index.css";
 
 function App() {
   const [studyHours, setStudyHours] = useState({});
+  const [showConfirmation, setShowConfirmation] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [selectedHour, setSelectedHour] = useState("1");
-  const [selectedMinute, setSelectedMinute] = useState("0");
+  const [studyDuration, setStudyDuration] = useState("00:00:00");
+  const [undoLog, setUndoLog] = useState(null);
+  const [undoTimer, setUndoTimer] = useState(null);
 
   useEffect(() => {
     const saved = localStorage.getItem("studyHours");
@@ -34,18 +37,40 @@ function App() {
   };
 
   const formatDate = (dateObj) => {
-    return dateObj.toISOString().split("T")[0];
+    return new Intl.DateTimeFormat("en-GB").format(dateObj).split("/").join("-");
+  };
+
+  const isValidDuration = (value) => {
+    return /^([01]\d|2[0-3]):[0-5]\d:[0-5]\d$/.test(value);
   };
 
   const getDurationInHours = () => {
-    return parseInt(selectedHour) + parseInt(selectedMinute) / 60;
+    if (!isValidDuration(studyDuration)) return 0;
+
+    const [h, m, s] = studyDuration.split(":").map(Number);
+    return h + m / 60 + s / 3600;
   };
 
+  const isFutureDate = (date) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const selected = new Date(date);
+    selected.setHours(0, 0, 0, 0);
+
+    return selected > today;
+  };
+
+
   const handleAddTime = () => {
+    if (isFutureDate(selectedDate)) return;
+
     const hoursToAdd = getDurationInHours();
     if (hoursToAdd <= 0) return;
 
     const key = formatDate(selectedDate);
+    if ((studyHours[key] || 0) + hoursToAdd > 24) return;
+
     const updated = {
       ...studyHours,
       [key]: (studyHours[key] || 0) + hoursToAdd,
@@ -53,12 +78,18 @@ function App() {
 
     setStudyHours(updated);
     saveToLocal(updated);
+
+    setShowConfirmation(true);
+    setTimeout(() => setShowConfirmation(false), 3000);
   };
 
   const handleSubtractTime = () => {
+    if (isFutureDate(selectedDate)) return;
     const hoursToSubtract = getDurationInHours();
+    if (hoursToSubtract <= 0) return;
+
     const key = formatDate(selectedDate);
-    if (hoursToSubtract <= 0 || !studyHours[key]) return;
+    if (!studyHours[key]) return;
 
     const current = studyHours[key];
     const newTime = current - hoursToSubtract;
@@ -72,109 +103,151 @@ function App() {
 
     setStudyHours(updated);
     saveToLocal(updated);
+
+    setShowConfirmation(true);
+    setTimeout(() => setShowConfirmation(false), 3000);
+  };
+
+  const handleUndoDelete = () => {
+    if (!undoLog) return;
+    const restored = { ...studyHours, [undoLog.date]: undoLog.hours };
+    setStudyHours(restored);
+    saveToLocal(restored);
+    setUndoLog(null);
+    clearTimeout(undoTimer);
   };
 
   const handleDeleteDate = (date) => {
-    const confirmDelete = window.confirm(
-      `Delete study log for ${date}? This cannot be undone.`
-    );
-    if (!confirmDelete) return;
-
+    const deletedEntry = { date, hours: studyHours[date] };
     const updated = { ...studyHours };
     delete updated[date];
 
     setStudyHours(updated);
     saveToLocal(updated);
+    setUndoLog(deletedEntry);
+
+    if (undoTimer) clearTimeout(undoTimer);
+    const timer = setTimeout(() => setUndoLog(null), 5000);
+    setUndoTimer(timer);
   };
 
   const data = Object.entries(studyHours)
-    .sort(([a], [b]) => new Date(a) - new Date(b))
+    .sort(([a], [b]) => {
+      const [d1, m1, y1] = a.split("-").map(Number);
+      const [d2, m2, y2] = b.split("-").map(Number);
+      return new Date(y1, m1 - 1, d1) - new Date(y2, m2 - 1, d2);
+    })
     .map(([date, hours]) => ({ date, hours }));
 
-  const hourOptions = Array.from({ length: 24 }, (_, i) => i);
-  const minuteOptions = Array.from({ length: 60 }, (_, i) => i);
+  const totalHours = Object.values(studyHours).reduce((a, b) => a + b, 0);
+  const totalDays = Object.keys(studyHours).length;
+  const avgHours = totalDays === 0 ? 0 : totalHours / totalDays;
 
   return (
     <>
       <Navbar />
-      <div className="container mx-auto my-5 rounded-xl shadow-lg bg-black p-5 min-h-[80vh] max-w-3xl text-white">
-        {/* Input Section */}
-        <div className="mb-6 bg-[#1a1a1a] p-6 rounded-xl shadow border border-gray-700">
-          <h2 className="text-xl font-bold mb-4">Update Study Time</h2>
+      <div className="container mx-auto my-5 px-4 sm:px-6 rounded-xl shadow-lg bg-black p-5 min-h-[80vh] max-w-3xl text-white scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent">
 
-          <div className="flex flex-col sm:flex-row gap-4 mb-4">
-            {/* Calendar Picker */}
+        {/* Input Section */}
+        <div className="bg-[#1a1a1a] p-8 rounded-2xl shadow-md border border-gray-700 mb-8 transition-all overflow-x-auto">
+          <h2 className="text-2xl font-bold mb-6 tracking-wide">Update Study Time</h2>
+
+          <div className="flex flex-col sm:flex-row gap-6 mb-6">
+            {/* Date Picker */}
             <div className="w-full sm:w-1/2">
-              <label className="block text-sm mb-1">Select Date:</label>
+              <label htmlFor="date-input" className="block text-sm mb-1">Select Date:</label>
               <DatePicker
+                id="date-input"
                 selected={selectedDate}
-                onChange={(date) => setSelectedDate(date)}
-                dateFormat="yyyy-MM-dd"
-                className="w-full rounded-md px-4 py-2 border border-gray-600 bg-black text-white"
-                calendarClassName="bg-black text-white"
+                onChange={(date) => date && setSelectedDate(date)}
+                dateFormat="dd-MM-yyyy"
+                className="focus:outline focus:ring-2 focus:ring-blue-500 flex-1 bg-neutral-800 hover:bg-neutral-700 px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-200 ease-in-out hover:scale-[1.02] cursor-pointer"
+                calendarClassName="dark-datepicker"
+                popperPlacement="bottom-start"
+                maxDate={new Date()} // ✅ Prevent selecting future dates
               />
+
             </div>
 
-            {/* Scroll Pickers for Hour and Minute */}
-            <div className="w-full sm:w-1/2 flex gap-2">
-              <div className="flex flex-col flex-1">
-                <label className="block text-sm mb-1">Hours</label>
-                <select
-                  value={selectedHour}
-                  onChange={(e) => setSelectedHour(e.target.value)}
-                  className="rounded-md px-2 py-2 border border-gray-600 bg-black text-white h-10"
-                >
-                  {hourOptions.map((h) => (
-                    <option key={h} value={h}>
-                      {h.toString().padStart(2, "0")}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            {/* Duration Input */}
+            <div className="w-full sm:w-1/2">
+              <label htmlFor="duration-input" className="block text-sm mb-1 text-gray-300">
+                Study Duration (HH:MM:SS):
+              </label>
+              <input
+                type="text"
+                id="duration-input"
+                value={studyDuration}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === "" || /^[0-9:]*$/.test(val)) {
+                    setStudyDuration(val);
+                  }
+                }}
+                placeholder="e.g. 02:30:15"
+                className="focus:outline focus:ring-2 focus:ring-blue-500 flex-1 bg-neutral-800 hover:bg-neutral-700 px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-200 ease-in-out hover:scale-[1.02] cursor-pointer"
 
-              <div className="flex flex-col flex-1">
-                <label className="block text-sm mb-1">Minutes</label>
-                <select
-                  value={selectedMinute}
-                  onChange={(e) => setSelectedMinute(e.target.value)}
-                  className="rounded-md px-2 py-2 border border-gray-600 bg-black text-white h-10"
-                >
-                  {minuteOptions.map((m) => (
-                    <option key={m} value={m}>
-                      {m.toString().padStart(2, "0")}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              />
+              {!isValidDuration(studyDuration) && (
+                <p className="mt-1 text-xs text-red-500">
+                  Invalid time. Use HH:MM:SS (00–23:59:59)
+                </p>
+              )}
+              <p className="mt-2 text-sm text-gray-400">
+                Total: <strong>{getDurationInHours().toFixed(4)} hours</strong>
+              </p>
             </div>
           </div>
 
           {/* Buttons */}
-          <div className="flex gap-2 justify-between">
+          <div className="flex flex-col sm:flex-row gap-3">
             <button
               onClick={handleAddTime}
-              className="flex-1 bg-green-700 hover:bg-green-600 px-3 py-2 rounded text-sm font-semibold"
+              className="focus:outline focus:ring-2 focus:ring-blue-500 flex-1 bg-[#3b3b3b] hover:bg-[#505050] px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-200 ease-in-out hover:scale-[1.02] cursor-pointer"
             >
               ➕ Add Time
             </button>
             <button
               onClick={handleSubtractTime}
-              className="flex-1 bg-yellow-700 hover:bg-yellow-600 px-3 py-2 rounded text-sm font-semibold"
+              className="focus:outline focus:ring-2 focus:ring-blue-500 flex-1 bg-[#3b3b3b] hover:bg-[#505050] px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-200 ease-in-out hover:scale-[1.02] cursor-pointer"
             >
               ➖ Subtract Time
             </button>
           </div>
         </div>
 
+        {/* Summary Stats */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8 text-center text-white">
+          <div className="bg-[#1a1a1a] p-4 rounded-xl shadow-md">
+            <div className="text-lg font-semibold">📅 Days Logged</div>
+            <div className="text-2xl mt-1">{totalDays}</div>
+          </div>
+          <div className="bg-[#1a1a1a] p-4 rounded-xl shadow-md">
+            <div className="text-lg font-semibold">⏳ Total Hours</div>
+            <div className="text-2xl mt-1">{totalHours.toFixed(2)}</div>
+          </div>
+          <div className="bg-[#1a1a1a] p-4 rounded-xl shadow-md">
+            <div className="text-lg font-semibold">📈 Avg. per Day</div>
+            <div className="text-2xl mt-1">{avgHours.toFixed(2)}</div>
+          </div>
+        </div>
+
         {/* Chart Section */}
-        <div className="bg-[#1a1a1a] p-6 rounded-xl shadow border border-gray-700 mb-6">
-          <h2 className="text-xl font-bold mb-4">Study Time Chart</h2>
+        <div className="bg-[#1a1a1a] p-8 rounded-2xl shadow-md border border-gray-700 mb-8 transition-all overflow-x-auto">
+          <h2 className="text-2xl font-bold mb-6 tracking-wide">Study Time Chart</h2>
           {data.length === 0 ? (
             <p className="text-gray-400 text-sm text-center">No data available</p>
           ) : (
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={data}>
-                <XAxis dataKey="date" stroke="#e5e5e5" />
+              <LineChart data={data}>
+                <XAxis
+                  dataKey="date"
+                  stroke="#e5e5e5"
+                  tickFormatter={(tick) => {
+                    const [day, month, year] = tick.split("-");
+                    return `${day}-${month}-${year}`;
+                  }}
+                />
                 <YAxis stroke="#e5e5e5" />
                 <Tooltip
                   contentStyle={{
@@ -184,30 +257,33 @@ function App() {
                   }}
                   labelStyle={{ color: "#fff" }}
                 />
-                <Bar dataKey="hours" fill="#38bdf8" />
-              </BarChart>
+                <Line type="monotone" dataKey="hours" stroke="#38bdf8" strokeWidth={2} dot={{ r: 4 }} />
+              </LineChart>
             </ResponsiveContainer>
           )}
         </div>
 
         {/* Logs Section */}
-        <div className="bg-[#1a1a1a] p-6 rounded-xl shadow border border-gray-700">
-          <h2 className="text-xl font-bold mb-4">Logs</h2>
+        <div className="bg-[#1a1a1a] p-8 rounded-2xl shadow-md border border-gray-700 mb-8 transition-all overflow-x-auto">
+          <h2 className="text-2xl font-bold mb-6 tracking-wide">Recent Days</h2>
           {data.length === 0 ? (
             <p className="text-gray-500 text-sm">No study records found.</p>
           ) : (
-            <ul className="space-y-3">
-              {data.map(({ date, hours }) => (
+            <ul className="space-y-3 text-sm break-words max-h-[300px] overflow-y-auto w-full sm:max-w-2xl mx-auto scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent">
+              {data.slice(-7).map(({ date, hours }) => (
                 <li
                   key={date}
-                  className="flex justify-between items-center bg-black border border-gray-600 rounded p-3"
+                  className="flex flex-col sm:flex-row justify-between sm:items-center bg-black border border-gray-700 rounded-lg p-4 transition-all hover:bg-[#111] space-y-2 sm:space-y-0"
                 >
                   <span>
-                    <strong>{date}</strong> - {hours.toFixed(2)} hours
+                    <strong>{(() => {
+                      const [d, m, y] = date.split("-");
+                      return `${d}-${m}-${y}`;
+                    })()}</strong> - {hours.toFixed(4)} hours
                   </span>
                   <button
                     onClick={() => handleDeleteDate(date)}
-                    className="bg-red-700 hover:bg-red-600 px-3 py-1 rounded text-sm font-semibold"
+                    className="focus:outline focus:ring-2 focus:ring-blue-500 bg-[#4a0000] hover:bg-[#5c0000] px-3 py-1 rounded-lg text-sm font-semibold transition-all duration-200 ease-in-out hover:scale-[1.02] cursor-pointer"
                   >
                     Delete
                   </button>
@@ -216,6 +292,26 @@ function App() {
             </ul>
           )}
         </div>
+
+        {/* Confirmation Toast */}
+        {showConfirmation && (
+          <div className="fixed bottom-6 right-6 bg-green-600 text-white px-4 py-2 rounded shadow-lg animate-fade-in-out z-50">
+            ✅ Study time updated successfully!
+          </div>
+        )}
+
+        {/* Undo Delete Toast */}
+        {undoLog && (
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-800 text-white px-4 py-3 rounded shadow-lg z-50 flex items-center gap-4 animate-fade-in-out2">
+            <span>Log for <strong>{undoLog.date}</strong> deleted.</span>
+            <button
+              onClick={handleUndoDelete}
+              className="focus:outline focus:ring-2 focus:ring-blue-500 text-blue-400 underline hover:text-blue-300 text-sm cursor-pointer"
+            >
+              Undo
+            </button>
+          </div>
+        )}
       </div>
     </>
   );
