@@ -20,6 +20,8 @@ function App() {
   const [undoLog, setUndoLog] = useState(null);
   const [undoTimer, setUndoTimer] = useState(null);
 
+
+
   useEffect(() => {
     const saved = localStorage.getItem("studyHours");
     if (saved) {
@@ -31,6 +33,112 @@ function App() {
       }
     }
   }, []);
+
+
+  const handleExport = () => {
+    const data = localStorage.getItem("studyHours"); // 🔄 Corrected key
+    if (data) {
+      const prettyData = JSON.stringify(JSON.parse(data), null, 2); // Optional formatting
+      const blob = new Blob([prettyData], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "time-tracker-export.json";
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } else {
+      console.warn("No studyHours found in localStorage.");
+    }
+  };
+
+
+
+
+
+  const handleImport = (event) => {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+
+    reader.onload = function (e) {
+      try {
+        const importedData = JSON.parse(e.target.result);
+
+        if (typeof importedData !== 'object' || Array.isArray(importedData)) {
+          alert("Invalid file format.");
+          return;
+        }
+
+        const existingDates = Object.keys(studyHours);
+        const newDates = Object.keys(importedData);
+
+        const conflictingDates = newDates.filter(date => existingDates.includes(date));
+
+        let resolutionMethod = "1"; // default
+
+        if (conflictingDates.length > 0) {
+          resolutionMethod = window.prompt(
+            `Conflicts found on ${conflictingDates.length} dates.\n\n` +
+            `Choose how to resolve:\n` +
+            `1 = Use higher value\n` +
+            `2 = Use average\n` +
+            `3 = Add both\n` +
+            `4 = Skip existing dates\n\n` +
+            `Enter 1, 2, 3, or 4`
+          );
+
+          if (!["1", "2", "3", "4"].includes(resolutionMethod)) {
+            alert("Import cancelled.");
+            return;
+          }
+        }
+
+        const merged = { ...studyHours };
+
+        newDates.forEach(date => {
+          const newVal = importedData[date];
+          const existingVal = merged[date];
+
+          if (!(date in merged)) {
+            merged[date] = newVal;
+          } else {
+            switch (resolutionMethod) {
+              case "1":
+                merged[date] = Math.max(existingVal, newVal);
+                break;
+              case "2":
+                merged[date] = parseFloat(((existingVal + newVal) / 2).toFixed(2));
+                break;
+              case "3":
+                merged[date] = parseFloat((existingVal + newVal).toFixed(2));
+                break;
+              case "4":
+                // Skip existing
+                break;
+            }
+          }
+        });
+
+        setStudyHours(merged);     // ✅ triggers re-render
+        saveToLocal(merged);       // ✅ saves to localStorage
+
+        alert("Import completed successfully.");
+      } catch (err) {
+        alert("Failed to parse imported file.");
+        console.error(err);
+      }
+    };
+
+    reader.readAsText(file);
+  };
+
+
+
 
   const saveToLocal = (data) => {
     localStorage.setItem("studyHours", JSON.stringify(data));
@@ -63,52 +171,52 @@ function App() {
 
 
 
-const handleUpdateTime = (isAddition) => {
-  if (!isValidDuration(studyDuration)) {
-    alert("Please enter a valid duration in HH:MM:SS format.");
-    return;
+  const handleUpdateTime = (isAddition) => {
+    if (!isValidDuration(studyDuration)) {
+      alert("Please enter a valid duration in HH:MM:SS format.");
+      return;
+    }
+
+    const hoursDelta = getDurationInHours();
+    if (hoursDelta <= 0) {
+      alert("Duration must be greater than 0.");
+      return;
+    }
+
+    const key = formatDate(selectedDate);
+    const currentHours = studyHours[key] || 0;
+    const newHours = isAddition ? currentHours + hoursDelta : currentHours - hoursDelta;
+
+    if (isAddition && newHours > 24) {
+      alert("Cannot log more than 24 hours in a single day.");
+      return;
+    }
+
+    const updated = { ...studyHours };
+    if (newHours <= 0) {
+      delete updated[key];
+      alert("Time subtracted completely. Entry deleted.");
+    } else {
+      updated[key] = newHours;
+    }
+
+    setStudyHours(updated);
+    saveToLocal(updated);
+    setShowConfirmation(true);
+    setStudyDuration("00:00:00");
+    setSelectedDate(new Date());
+  };
+
+
+  function formatToHHMMSS(decimalHours) {
+    const totalSeconds = Math.floor(decimalHours * 3600);
+    const hrs = Math.floor(totalSeconds / 3600);
+    const mins = Math.floor((totalSeconds % 3600) / 60);
+    const secs = totalSeconds % 60;
+    return `${hrs.toString().padStart(2, "0")}:${mins
+      .toString()
+      .padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   }
-
-  const hoursDelta = getDurationInHours();
-  if (hoursDelta <= 0) {
-    alert("Duration must be greater than 0.");
-    return;
-  }
-
-  const key = formatDate(selectedDate);
-  const currentHours = studyHours[key] || 0;
-  const newHours = isAddition ? currentHours + hoursDelta : currentHours - hoursDelta;
-
-  if (isAddition && newHours > 24) {
-    alert("Cannot log more than 24 hours in a single day.");
-    return;
-  }
-
-  const updated = { ...studyHours };
-  if (newHours <= 0) {
-    delete updated[key];
-    alert("Time subtracted completely. Entry deleted.");
-  } else {
-    updated[key] = newHours;
-  }
-
-  setStudyHours(updated);
-  saveToLocal(updated);
-  setShowConfirmation(true);
-  setStudyDuration("00:00:00");
-  setSelectedDate(new Date());
-};
-
-
-function formatToHHMMSS(decimalHours) {
-  const totalSeconds = Math.floor(decimalHours * 3600);
-  const hrs = Math.floor(totalSeconds / 3600);
-  const mins = Math.floor((totalSeconds % 3600) / 60);
-  const secs = totalSeconds % 60;
-  return `${hrs.toString().padStart(2, "0")}:${mins
-    .toString()
-    .padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
-}
 
   const handleUndoDelete = () => {
     if (!undoLog) return;
@@ -129,13 +237,13 @@ function formatToHHMMSS(decimalHours) {
     setUndoLog(deletedEntry);
 
     if (undoTimer) {
-  clearTimeout(undoTimer);
-}
-const timer = setTimeout(() => {
-  setUndoLog(null);
-  setUndoTimer(null); // ✅ Also reset the timer ref
-}, 5000);
-setUndoTimer(timer);
+      clearTimeout(undoTimer);
+    }
+    const timer = setTimeout(() => {
+      setUndoLog(null);
+      setUndoTimer(null); // ✅ Also reset the timer ref
+    }, 5000);
+    setUndoTimer(timer);
 
   };
 
@@ -160,6 +268,7 @@ setUndoTimer(timer);
         <div className="bg-[#1a1a1a] p-8 rounded-2xl shadow-md border border-gray-700 mb-8 transition-all overflow-x-auto">
           <h2 className="text-2xl font-bold mb-6 tracking-wide">Update Study Time</h2>
 
+
           <div className="flex flex-col sm:flex-row gap-6 mb-6">
             {/* Date Picker */}
             <div className="w-full sm:w-1/2">
@@ -172,8 +281,8 @@ setUndoTimer(timer);
                 className="focus:outline focus:ring-2 focus:ring-blue-500 flex-1 bg-neutral-800 hover:bg-neutral-700 px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-200 ease-in-out hover:scale-[1.02] cursor-pointer"
                 calendarClassName="dark-datepicker"
                 popperPlacement="bottom-start"
-                 minDate={new Date(new Date().setDate(new Date().getDate() - 31))}
-  maxDate={new Date()}
+                minDate={new Date(new Date().setDate(new Date().getDate() - 31))}
+                maxDate={new Date()}
               />
 
             </div>
@@ -202,7 +311,7 @@ setUndoTimer(timer);
                   Invalid time. Use HH:MM:SS (00–23:59:59)
                 </p>
               )}
-              
+
             </div>
           </div>
 
@@ -223,6 +332,7 @@ setUndoTimer(timer);
           </div>
         </div>
 
+
         {/* Summary Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8 text-center text-white">
           <div className="bg-[#1a1a1a] p-4 rounded-xl shadow-md">
@@ -238,6 +348,53 @@ setUndoTimer(timer);
             <div className="text-2xl mt-1">{avgHours.toFixed(2)}</div>
           </div>
         </div>
+
+
+<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mb-8 text-white">
+  {/* Export Card */}
+  <div className="bg-[#1a1a1a] p-6 rounded-xl shadow-md border border-[#2d2d2d] hover:shadow-lg transition-shadow duration-300">
+    <h2 className="text-lg font-semibold mb-3">Export Your Data</h2>
+    <p className="text-sm text-gray-400 mb-4">Download your saved time logs as a JSON file.</p>
+    <button
+      onClick={handleExport}
+      className="focus:outline focus:ring-2 focus:ring-blue-500 flex-1 bg-[#3b3b3b] hover:bg-[#505050] px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-200 ease-in-out hover:scale-[1.02] cursor-pointer"
+    >
+      📤 Export Data
+    </button>
+  </div>
+
+  {/* Import Card */}
+  <div className="bg-[#1a1a1a] p-6 rounded-xl shadow-md border border-[#2d2d2d] hover:shadow-lg transition-shadow duration-300">
+    <h2 className="text-lg font-semibold mb-3">Import Data</h2>
+    <p className="text-sm text-gray-400 mb-4">Upload a backup JSON file to restore your data.</p>
+    <label
+      htmlFor="file-input"
+       className="focus:outline focus:ring-2 focus:ring-blue-500 flex-1 bg-[#3b3b3b] hover:bg-[#505050] px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-200 ease-in-out hover:scale-[1.02] cursor-pointer"
+    >
+      📥 Import Data
+      <input
+        id="file-input"
+        type="file"
+        accept=".json"
+        onChange={handleImport}
+        className="hidden"
+      />
+    </label>
+  </div>
+
+  {/* Optional Info Card or Spacer */}
+  <div className="bg-[#1a1a1a] p-6 rounded-xl shadow-md border border-[#2d2d2d] text-gray-400 hover:shadow-lg transition-shadow duration-300">
+    <h2 className="text-lg font-semibold text-white mb-3">Tips</h2>
+    <ul className="text-sm list-disc list-inside">
+      <li>Make sure to import only trusted files</li>
+      <li>Refresh after importing to reflect changes</li>
+    </ul>
+  </div>
+</div>
+
+
+
+
 
         {/* Chart Section */}
         <div className="bg-[#1a1a1a] p-8 rounded-2xl shadow-md border border-gray-700 mb-8 transition-all overflow-x-auto">
@@ -257,8 +414,8 @@ setUndoTimer(timer);
                 />
                 <YAxis stroke="#e5e5e5" />
                 <Tooltip
-                formatter={(value) => formatToHHMMSS(value)} 
-      labelFormatter={(label) => `Date: ${label}`}
+                  formatter={(value) => formatToHHMMSS(value)}
+                  labelFormatter={(label) => `Date: ${label}`}
                   contentStyle={{
                     backgroundColor: "#1a1a1a",
                     borderColor: "#4b5563",
