@@ -341,56 +341,56 @@ function App() {
           </div>
           <div className="bg-[#1a1a1a] p-4 rounded-xl shadow-md">
             <div className="text-lg font-semibold">⏳ Total Hours</div>
-            <div className="text-2xl mt-1">{totalHours.toFixed(2)}</div>
+            <div className="text-2xl mt-1">{formatToHHMMSS(totalHours)}</div>
           </div>
           <div className="bg-[#1a1a1a] p-4 rounded-xl shadow-md">
             <div className="text-lg font-semibold">📈 Avg. per Day</div>
-            <div className="text-2xl mt-1">{avgHours.toFixed(2)}</div>
+            <div className="text-2xl mt-1">{formatToHHMMSS(avgHours)}</div>
           </div>
         </div>
 
 
-<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mb-8 text-white">
-  {/* Export Card */}
-  <div className="bg-[#1a1a1a] p-6 rounded-xl shadow-md border border-[#2d2d2d] hover:shadow-lg transition-shadow duration-300">
-    <h2 className="text-lg font-semibold mb-3">Export Your Data</h2>
-    <p className="text-sm text-gray-400 mb-4">Download your saved time logs as a JSON file.</p>
-    <button
-      onClick={handleExport}
-      className="focus:outline focus:ring-2 focus:ring-blue-500 flex-1 bg-[#3b3b3b] hover:bg-[#505050] px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-200 ease-in-out hover:scale-[1.02] cursor-pointer"
-    >
-      📤 Export Data
-    </button>
-  </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mb-8 text-white">
+          {/* Export Card */}
+          <div className="bg-[#1a1a1a] p-6 rounded-xl shadow-md border border-[#2d2d2d] hover:shadow-lg transition-shadow duration-300">
+            <h2 className="text-lg font-semibold mb-3">Export Your Data</h2>
+            <p className="text-sm text-gray-400 mb-4">Download your saved time logs as a JSON file.</p>
+            <button
+              onClick={handleExport}
+              className="focus:outline focus:ring-2 focus:ring-blue-500 flex-1 bg-[#3b3b3b] hover:bg-[#505050] px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-200 ease-in-out hover:scale-[1.02] cursor-pointer"
+            >
+              📤 Export Data
+            </button>
+          </div>
 
-  {/* Import Card */}
-  <div className="bg-[#1a1a1a] p-6 rounded-xl shadow-md border border-[#2d2d2d] hover:shadow-lg transition-shadow duration-300">
-    <h2 className="text-lg font-semibold mb-3">Import Data</h2>
-    <p className="text-sm text-gray-400 mb-4">Upload a backup JSON file to restore your data.</p>
-    <label
-      htmlFor="file-input"
-       className="focus:outline focus:ring-2 focus:ring-blue-500 flex-1 bg-[#3b3b3b] hover:bg-[#505050] px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-200 ease-in-out hover:scale-[1.02] cursor-pointer"
-    >
-      📥 Import Data
-      <input
-        id="file-input"
-        type="file"
-        accept=".json"
-        onChange={handleImport}
-        className="hidden"
-      />
-    </label>
-  </div>
+          {/* Import Card */}
+          <div className="bg-[#1a1a1a] p-6 rounded-xl shadow-md border border-[#2d2d2d] hover:shadow-lg transition-shadow duration-300">
+            <h2 className="text-lg font-semibold mb-3">Import Data</h2>
+            <p className="text-sm text-gray-400 mb-4">Upload a backup JSON file to restore your data.</p>
+            <label
+              htmlFor="file-input"
+              className="focus:outline focus:ring-2 focus:ring-blue-500 flex-1 bg-[#3b3b3b] hover:bg-[#505050] px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-200 ease-in-out hover:scale-[1.02] cursor-pointer"
+            >
+              📥 Import Data
+              <input
+                id="file-input"
+                type="file"
+                accept=".json"
+                onChange={handleImport}
+                className="hidden"
+              />
+            </label>
+          </div>
 
-  {/* Optional Info Card or Spacer */}
-  <div className="bg-[#1a1a1a] p-6 rounded-xl shadow-md border border-[#2d2d2d] text-gray-400 hover:shadow-lg transition-shadow duration-300">
-    <h2 className="text-lg font-semibold text-white mb-3">Tips</h2>
-    <ul className="text-sm list-disc list-inside">
-      <li>Make sure to import only trusted files</li>
-      <li>Refresh after importing to reflect changes</li>
-    </ul>
-  </div>
-</div>
+          {/* Optional Info Card or Spacer */}
+          <div className="bg-[#1a1a1a] p-6 rounded-xl shadow-md border border-[#2d2d2d] text-gray-400 hover:shadow-lg transition-shadow duration-300">
+            <h2 className="text-lg font-semibold text-white mb-3">Tips</h2>
+            <ul className="text-sm list-disc list-inside">
+              <li>Make sure to import only trusted files</li>
+              <li>Refresh after importing to reflect changes</li>
+            </ul>
+          </div>
+        </div>
 
 
 
@@ -436,28 +436,38 @@ function App() {
             <p className="text-gray-500 text-sm">No study records found.</p>
           ) : (
             <ul className="space-y-3 text-sm break-words max-h-[300px] overflow-y-auto w-full sm:max-w-2xl mx-auto scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent">
-              {data.slice(-7).map(({ date, hours }) => (
-                <li
-                  key={date}
-                  className="flex flex-col sm:flex-row justify-between sm:items-center bg-black border border-gray-700 rounded-lg p-4 transition-all hover:bg-[#111] space-y-2 sm:space-y-0"
-                >
-                  <span>
-                    <strong>{(() => {
-                      const [d, m, y] = date.split("-");
-                      return `${d}-${m}-${y}`;
-                    })()}</strong> - {formatToHHMMSS(hours)} hours
-                  </span>
-                  <button
-                    onClick={() => handleDeleteDate(date)}
-                    className="focus:outline focus:ring-2 focus:ring-blue-500 bg-[#4a0000] hover:bg-[#5c0000] px-3 py-1 rounded-lg text-sm font-semibold transition-all duration-200 ease-in-out hover:scale-[1.02] cursor-pointer"
+              {[...data]
+                .sort((a, b) => {
+                  const [dayA, monthA, yearA] = a.date.split("-").map(Number);
+                  const [dayB, monthB, yearB] = b.date.split("-").map(Number);
+                  const dateA = new Date(yearA, monthA - 1, dayA);
+                  const dateB = new Date(yearB, monthB - 1, dayB);
+                  return dateB - dateA; // Descending order
+                })
+                .slice(0, 7)
+                .map(({ date, hours }) => (
+                  <li
+                    key={date}
+                    className="flex flex-col sm:flex-row justify-between sm:items-center bg-black border border-gray-700 rounded-lg p-4 transition-all hover:bg-[#111] space-y-2 sm:space-y-0"
                   >
-                    Delete
-                  </button>
-                </li>
-              ))}
+                    <span>
+                      <strong>{(() => {
+                        const [d, m, y] = date.split("-");
+                        return `${d}-${m}-${y}`;
+                      })()}</strong> - {formatToHHMMSS(hours)} hours
+                    </span>
+                    <button
+                      onClick={() => handleDeleteDate(date)}
+                      className="focus:outline focus:ring-2 focus:ring-blue-500 bg-[#4a0000] hover:bg-[#5c0000] px-3 py-1 rounded-lg text-sm font-semibold transition-all duration-200 ease-in-out hover:scale-[1.02] cursor-pointer"
+                    >
+                      Delete
+                    </button>
+                  </li>
+                ))}
             </ul>
           )}
         </div>
+
 
         {/* Confirmation Toast */}
         {showConfirmation && (
