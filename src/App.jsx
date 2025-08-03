@@ -404,7 +404,7 @@ function App() {
     <p className="text-sm text-gray-400 mb-4">Download your saved time logs as a JSON file.</p>
     <button
       onClick={handleExport}
-      className="w-full inline-flex items-center justify-center gap-2 bg-[#3b3b3b] hover:bg-[#505050] px-4 py-3 rounded-lg text-sm font-semibold text-white transition-all duration-200 ease-in-out hover:scale-[1.02] focus:outline focus:ring-2 focus:ring-blue-500"
+      className="w-full inline-flex items-center justify-center gap-2 bg-[#3b3b3b] hover:bg-[#505050] px-4 py-3 rounded-lg text-sm font-semibold text-white transition-all duration-200 ease-in-out hover:scale-[1.02] focus:outline focus:ring-2 focus:ring-blue-500 cursor-pointer"
     >
       <span>Export Data</span>
     </button>
@@ -450,7 +450,7 @@ function App() {
         if (window.lastImportUndo) window.lastImportUndo();
         else alert("No recent import to undo.");
       }}
-      className="w-full inline-flex items-center justify-center gap-2 bg-[#3b3b3b] hover:bg-[#505050] px-4 py-3 rounded-lg text-sm font-semibold text-white transition-all duration-200 ease-in-out hover:scale-[1.02] focus:outline focus:ring-2 focus:ring-blue-500"
+      className="w-full cursor-pointer inline-flex items-center justify-center gap-2 bg-[#3b3b3b] hover:bg-[#505050] px-4 py-3 rounded-lg text-sm font-semibold text-white transition-all duration-200 ease-in-out hover:scale-[1.02] focus:outline focus:ring-2 focus:ring-blue-500"
     >
       <svg
         xmlns="http://www.w3.org/2000/svg"
