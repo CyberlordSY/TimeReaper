@@ -37,7 +37,7 @@ A sleek and responsive React app to track your **daily study time**, visualize p
 ## 🚀 Live Demo
 
 Hosted on **Vercel**  
-🔗 [Open TimeReaper App](https://your-vercel-link.vercel.app)
+🔗 [Open TimeReaper App](https://time-reaper.vercel.app)
 
 ---
 
