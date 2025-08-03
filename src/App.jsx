@@ -57,8 +57,6 @@ function App() {
 
 
 
-
-
   const handleImport = (event) => {
     const file = event.target.files && event.target.files[0];
     if (!file) return;
@@ -67,23 +65,59 @@ function App() {
 
     reader.onload = function (e) {
       try {
-        const importedData = JSON.parse(e.target.result);
+        const importedRaw = JSON.parse(e.target.result);
 
-        if (typeof importedData !== 'object' || Array.isArray(importedData)) {
-          alert("Invalid file format.");
+        // Validate format
+        if (typeof importedRaw !== 'object' || importedRaw === null || Array.isArray(importedRaw)) {
+          alert("Invalid file format. Please upload a valid JSON object.");
           return;
         }
 
-        const existingDates = Object.keys(studyHours);
+        // Normalize date keys: trim and keep only valid number values
+        const importedData = {};
+        for (let key in importedRaw) {
+          const trimmedKey = key.trim();
+          const val = importedRaw[key];
+          if (typeof val === 'number' && !isNaN(val)) {
+            importedData[trimmedKey] = val;
+          }
+        }
+
         const newDates = Object.keys(importedData);
+        const existingDates = Object.keys(studyHours);
 
+        // Warn on large dataset
+        if (newDates.length > 1000) {
+          const confirmLarge = window.confirm("You're importing over 1000 entries. Continue?");
+          if (!confirmLarge) return;
+        }
+
+        // Preview option
+        const preview = window.confirm("Do you want to preview the imported data before applying?");
+        if (preview) {
+          console.table(importedData); // You can replace with a custom UI modal
+          const proceed = window.confirm("Proceed with import?");
+          if (!proceed) return;
+        }
+
+        // Backup current state
+        const backupConfirm = window.confirm("Do you want to download a backup of current data before import?");
+        if (backupConfirm) {
+          const blob = new Blob([JSON.stringify(studyHours, null, 2)], { type: 'application/json' });
+          const link = document.createElement('a');
+          link.href = URL.createObjectURL(blob);
+          link.download = 'backup-study-hours.json';
+          link.click();
+        }
+
+        // Detect conflicts
         const conflictingDates = newDates.filter(date => existingDates.includes(date));
-
         let resolutionMethod = "1"; // default
 
         if (conflictingDates.length > 0) {
+          const sample = conflictingDates.slice(0, 5).join(", ") + (conflictingDates.length > 5 ? ", ..." : "");
           resolutionMethod = window.prompt(
-            `Conflicts found on ${conflictingDates.length} dates.\n\n` +
+            `Conflicts found on ${conflictingDates.length} date(s):\n${sample}\n\n` +
             `Choose how to resolve:\n` +
             `1 = Use higher value\n` +
             `2 = Use average\n` +
@@ -93,49 +127,60 @@ function App() {
           );
 
           if (!["1", "2", "3", "4"].includes(resolutionMethod)) {
-            alert("Import cancelled.");
+            alert("Import cancelled due to invalid choice.");
             return;
           }
         }
 
-        const merged = { ...studyHours };
+        // Conflict resolution logic
+        function resolveConflict(existing, incoming, method, date) {
+          if (typeof existing !== "number" || typeof incoming !== "number") {
+            throw new Error(`Invalid numeric value detected on date: ${date}`);
+          }
 
+          switch (method) {
+            case "1": return Math.max(existing, incoming);
+            case "2": return parseFloat(((existing + incoming) / 2).toFixed(2));
+            case "3": return parseFloat((existing + incoming).toFixed(2));
+            case "4": return existing; // keep old
+            default: return existing;
+          }
+        }
+
+        // Save old data for undo
+        const previousData = { ...studyHours };
+
+        const merged = { ...studyHours };
         newDates.forEach(date => {
           const newVal = importedData[date];
-          const existingVal = merged[date];
-
           if (!(date in merged)) {
             merged[date] = newVal;
-          } else {
-            switch (resolutionMethod) {
-              case "1":
-                merged[date] = Math.max(existingVal, newVal);
-                break;
-              case "2":
-                merged[date] = parseFloat(((existingVal + newVal) / 2).toFixed(2));
-                break;
-              case "3":
-                merged[date] = parseFloat((existingVal + newVal).toFixed(2));
-                break;
-              case "4":
-                // Skip existing
-                break;
-            }
+          } else if (resolutionMethod !== "4") {
+            merged[date] = resolveConflict(merged[date], newVal, resolutionMethod, date);
           }
         });
 
-        setStudyHours(merged);     // ✅ triggers re-render
-        saveToLocal(merged);       // ✅ saves to localStorage
+        // Save + Apply
+        setStudyHours(merged);
+        saveToLocal(merged);
+        alert("Import completed successfully. You can undo if needed.");
 
-        alert("Import completed successfully.");
+        // Optional: Provide Undo Button (if you're using a UI framework)
+        window.lastImportUndo = () => {
+          setStudyHours(previousData);
+          saveToLocal(previousData);
+          alert("Reverted to previous data.");
+        };
+
       } catch (err) {
-        alert("Failed to parse imported file.");
+        alert("Failed to parse or import data.");
         console.error(err);
       }
     };
 
     reader.readAsText(file);
   };
+
 
 
 
@@ -350,47 +395,81 @@ function App() {
         </div>
 
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mb-8 text-white">
-          {/* Export Card */}
-          <div className="bg-[#1a1a1a] p-6 rounded-xl shadow-md border border-[#2d2d2d] hover:shadow-lg transition-shadow duration-300">
-            <h2 className="text-lg font-semibold mb-3">Export Your Data</h2>
-            <p className="text-sm text-gray-400 mb-4">Download your saved time logs as a JSON file.</p>
-            <button
-              onClick={handleExport}
-              className="focus:outline focus:ring-2 focus:ring-blue-500 flex-1 bg-[#3b3b3b] hover:bg-[#505050] px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-200 ease-in-out hover:scale-[1.02] cursor-pointer"
-            >
-              📤 Export Data
-            </button>
-          </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mb-8 text-white">
+  {/* Export Card */}
+  <div className="bg-[#1a1a1a] p-6 rounded-2xl shadow-md border border-[#2d2d2d] hover:shadow-lg transition-shadow duration-300">
+    <h2 className="text-xl font-semibold mb-3 flex items-center gap-2">
+      📤 Export Your Data
+    </h2>
+    <p className="text-sm text-gray-400 mb-4">Download your saved time logs as a JSON file.</p>
+    <button
+      onClick={handleExport}
+      className="w-full inline-flex items-center justify-center gap-2 bg-[#3b3b3b] hover:bg-[#505050] px-4 py-3 rounded-lg text-sm font-semibold text-white transition-all duration-200 ease-in-out hover:scale-[1.02] focus:outline focus:ring-2 focus:ring-blue-500"
+    >
+      <span>Export Data</span>
+    </button>
+  </div>
 
-          {/* Import Card */}
-          <div className="bg-[#1a1a1a] p-6 rounded-xl shadow-md border border-[#2d2d2d] hover:shadow-lg transition-shadow duration-300">
-            <h2 className="text-lg font-semibold mb-3">Import Data</h2>
-            <p className="text-sm text-gray-400 mb-4">Upload a backup JSON file to restore your data.</p>
-            <label
-              htmlFor="file-input"
-              className="focus:outline focus:ring-2 focus:ring-blue-500 flex-1 bg-[#3b3b3b] hover:bg-[#505050] px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-200 ease-in-out hover:scale-[1.02] cursor-pointer"
-            >
-              📥 Import Data
-              <input
-                id="file-input"
-                type="file"
-                accept=".json"
-                onChange={handleImport}
-                className="hidden"
-              />
-            </label>
-          </div>
+  {/* Import Card */}
+  <div className="bg-[#1a1a1a] p-6 rounded-2xl shadow-md border border-[#2d2d2d] hover:shadow-lg transition-shadow duration-300">
+    <h2 className="text-xl font-semibold mb-3 flex items-center gap-2">
+      📥 Import Data
+    </h2>
+    <p className="text-sm text-gray-400 mb-4">Upload a backup JSON file to restore your data.</p>
+    <label
+      htmlFor="file-input"
+      className="w-full inline-flex items-center justify-center gap-2 bg-[#3b3b3b] hover:bg-[#505050] px-4 py-3 rounded-lg text-sm font-semibold text-white transition-all duration-200 ease-in-out hover:scale-[1.02] cursor-pointer focus:outline focus:ring-2 focus:ring-blue-500"
+    >
+      <span>Import Data</span>
+      <input
+        id="file-input"
+        type="file"
+        accept=".json"
+        onChange={handleImport}
+        className="hidden"
+      />
+    </label>
+  </div>
 
-          {/* Optional Info Card or Spacer */}
-          <div className="bg-[#1a1a1a] p-6 rounded-xl shadow-md border border-[#2d2d2d] text-gray-400 hover:shadow-lg transition-shadow duration-300">
-            <h2 className="text-lg font-semibold text-white mb-3">Tips</h2>
-            <ul className="text-sm list-disc list-inside">
-              <li>Make sure to import only trusted files</li>
-              <li>Refresh after importing to reflect changes</li>
-            </ul>
-          </div>
-        </div>
+  {/* Tips Card */}
+  <div className="bg-[#1a1a1a] p-6 rounded-2xl shadow-md border border-[#2d2d2d] hover:shadow-lg transition-shadow duration-300 text-gray-300">
+    <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[#503838]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z" />
+      </svg>
+      Tips
+    </h2>
+
+    <ul className="text-sm space-y-2 text-gray-400 list-disc list-inside mb-4">
+      <li>Only import trusted files</li>
+      <li>Refresh to ensure changes take effect</li>
+    </ul>
+
+    <button
+      onClick={() => {
+        if (window.lastImportUndo) window.lastImportUndo();
+        else alert("No recent import to undo.");
+      }}
+      className="w-full inline-flex items-center justify-center gap-2 bg-[#3b3b3b] hover:bg-[#505050] px-4 py-3 rounded-lg text-sm font-semibold text-white transition-all duration-200 ease-in-out hover:scale-[1.02] focus:outline focus:ring-2 focus:ring-blue-500"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="w-5 h-5 border-[#2d2d2d]"
+      >
+        <path d="M9 14L4 9l5-5" />
+        <path d="M20 20c0-5.5-4.5-10-10-10H4" />
+      </svg>
+      <span>Undo Last Import</span>
+    </button>
+  </div>
+</div>
+
 
 
 
