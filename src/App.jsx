@@ -147,7 +147,7 @@ function App() {
           }
         }
 
-        // Save old data for undo
+        
         const previousData = { ...studyHours };
 
         const merged = { ...studyHours };
@@ -160,12 +160,12 @@ function App() {
           }
         });
 
-        // Save + Apply
+        
         setStudyHours(merged);
         saveToLocal(merged);
         alert("Import completed successfully. You can undo if needed.");
 
-        // Optional: Provide Undo Button (if you're using a UI framework)
+        
         window.lastImportUndo = () => {
           setStudyHours(previousData);
           saveToLocal(previousData);
@@ -309,13 +309,13 @@ function App() {
       <Navbar />
       <div className="container mx-auto my-5 px-4 sm:px-6 rounded-xl shadow-lg bg-black p-5 min-h-[80vh] max-w-3xl text-white scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent">
 
-        {/* Input Section */}
+        
         <div className="bg-[#1a1a1a] p-8 rounded-2xl shadow-md border border-gray-700 mb-8 transition-all overflow-x-auto">
           <h2 className="text-2xl font-bold mb-6 tracking-wide">Update Study Time</h2>
 
 
           <div className="flex flex-col sm:flex-row gap-6 mb-6">
-            {/* Date Picker */}
+            
             <div className="w-full sm:w-1/2">
               <label htmlFor="date-input" className="block text-sm mb-1">Select Date:</label>
               <DatePicker
@@ -332,7 +332,7 @@ function App() {
 
             </div>
 
-            {/* Duration Input */}
+            
             <div className="w-full sm:w-1/2">
               <label htmlFor="duration-input" className="block text-sm mb-1 text-gray-300">
                 Study Duration (HH:MM:SS):
@@ -360,7 +360,7 @@ function App() {
             </div>
           </div>
 
-          {/* Buttons */}
+          
           <div className="flex flex-col sm:flex-row gap-3">
             <button
               onClick={() => handleUpdateTime(true)} // add
@@ -378,7 +378,7 @@ function App() {
         </div>
 
 
-        {/* Summary Stats */}
+        
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8 text-center text-white">
           <div className="bg-[#1a1a1a] p-4 rounded-xl shadow-md">
             <div className="text-lg font-semibold">📅 Days Studied</div>
@@ -396,7 +396,7 @@ function App() {
 
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mb-8 text-white">
-  {/* Export Card */}
+  
   <div className="bg-[#1a1a1a] p-6 rounded-2xl shadow-md border border-[#2d2d2d] hover:shadow-lg transition-shadow duration-300">
     <h2 className="text-xl font-semibold mb-3 flex items-center gap-2">
       📤 Export Your Data
@@ -410,7 +410,7 @@ function App() {
     </button>
   </div>
 
-  {/* Import Card */}
+  
   <div className="bg-[#1a1a1a] p-6 rounded-2xl shadow-md border border-[#2d2d2d] hover:shadow-lg transition-shadow duration-300">
     <h2 className="text-xl font-semibold mb-3 flex items-center gap-2">
       📥 Import Data
@@ -431,7 +431,7 @@ function App() {
     </label>
   </div>
 
-  {/* Tips Card */}
+  
   <div className="bg-[#1a1a1a] p-6 rounded-2xl shadow-md border border-[#2d2d2d] hover:shadow-lg transition-shadow duration-300 text-gray-300">
     <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[#503838]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -475,7 +475,7 @@ function App() {
 
 
 
-        {/* Chart Section */}
+        
         <div className="bg-[#1a1a1a] p-8 rounded-2xl shadow-md border border-gray-700 mb-8 transition-all overflow-x-auto">
           <h2 className="text-2xl font-bold mb-6 tracking-wide">Study Time Chart</h2>
           {data.length === 0 ? (
@@ -508,7 +508,7 @@ function App() {
           )}
         </div>
 
-        {/* Logs Section */}
+
         <div className="bg-[#1a1a1a] p-8 rounded-2xl shadow-md border border-gray-700 mb-8 transition-all overflow-x-auto">
           <h2 className="text-2xl font-bold mb-6 tracking-wide">Recent Days</h2>
           {data.length === 0 ? (
@@ -548,14 +548,14 @@ function App() {
         </div>
 
 
-        {/* Confirmation Toast */}
+        
         {showConfirmation && (
           <div className="fixed bottom-6 right-6 bg-green-600 text-white px-4 py-2 rounded shadow-lg animate-fade-in-out z-50">
             ✅ Study time updated successfully!
           </div>
         )}
 
-        {/* Undo Delete Toast */}
+        
         {undoLog && (
           <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-800 text-white px-4 py-3 rounded shadow-lg z-50 flex items-center gap-4 animate-fade-in-out2">
             <span>Log for <strong>{undoLog.date}</strong> deleted.</span>
